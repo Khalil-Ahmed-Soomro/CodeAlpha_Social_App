@@ -1,1 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pulse - Mini Social Media</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        h1 { margin: 0; color: var(--primary); font-size: 1.5rem; }
+        .container {
+            max-width: 700px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        textarea, select, input {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            margin-bottom: 0.75rem;
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button:hover { background: var(--primary-hover); }
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .author { font-weight: bold; color: var(--text); }
+        .username { color: var(--text-muted); font-size: 0.85rem; margin-left: 0.5rem; }
+        .post-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            border-top: 1px solid var(--border);
+            padding-top: 0.75rem;
+        }
+        .action-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            font-size: 0.9rem;
+        }
+        .action-btn.liked { color: #ec4899; }
+        .comments-section {
+            margin-top: 1rem;
+            border-top: 1px dashed var(--border);
+            padding-top: 0.75rem;
+        }
+        .comment {
+            background: #0f172a;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .signup-toggle {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 0.4rem 0.8rem;
+            font-size: 0.85rem;
+        }
+        .signup-toggle:hover {
+            background: var(--primary);
+            color: white;
+        }
+    </style>
+</head>
+<body>
 
+    <header>
+        <h1>⚡ Pulse</h1>
+        <div class="header-controls">
+            <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Active User:</label>
+                <select id="activeUser" onchange="switchUser()" style="margin-bottom:0; width: 180px; padding: 0.4rem;"></select>
+            </div>
+            <button class="signup-toggle" onclick="toggleSignupModal()">+ New Account</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Register / Signup Card (Hidden by default) -->
+        <div id="signupCard" class="card" style="display: none; border-color: var(--primary);">
+            <h3>Create New Account</h3>
+            <input type="text" id="newName" placeholder="Full Name (e.g., Ali Khan)">
+            <input type="text" id="newUsername" placeholder="Username (e.g., ali_khan - no spaces)">
+            <input type="text" id="newBio" placeholder="Short Bio">
+            <div style="display: flex; gap: 0.5rem;">
+                <button onclick="registerUser()">Register Account</button>
+                <button style="background: var(--border);" onclick="toggleSignupModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Create Post Card -->
+        <div class="card">
+            <h3>Create Post</h3>
+            <textarea id="postContent" rows="3" placeholder="What's happening in your tech world?"></textarea>
+            <button onclick="createPost()">Post</button>
+        </div>
+
+        <!-- Feed -->
+        <div id="feed"></div>
+    </div>
+
+    <script>
+        let currentUser = 1;
+
+        async function init() {
+            await loadUsers();
+            await loadPosts();
+        }
+
+        async function loadUsers() {
+            const res = await fetch('/api/users');
+            const users = await res.json();
+            const select = document.getElementById('activeUser');
+            select.innerHTML = '';
+            users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                opt.textContent = `${u.name} (@${u.username})`;
+                if (u.id === currentUser) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        function switchUser() {
+            currentUser = parseInt(document.getElementById('activeUser').value);
+            loadPosts();
+        }
+
+        function toggleSignupModal() {
+            const card = document.getElementById('signupCard');
+            card.style.display = card.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function registerUser() {
+            const name = document.getElementById('newName').value.trim();
+            const username = document.getElementById('newUsername').value.trim().toLowerCase();
+            const bio = document.getElementById('newBio').value.trim();
+
+            if (!name || !username) {
+                alert('Please enter both Name and Username!');
+                return;
+            }
+
+            const res = await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, username, bio })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                alert(`Account created successfully for @${data.username}!`);
+                document.getElementById('newName').value = '';
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newBio').value = '';
+                toggleSignupModal();
+                
+                await loadUsers();
+                currentUser = data.id;
+                document.getElementById('activeUser').value = currentUser;
+                loadPosts();
+            } else {
+                alert(data.error || 'Failed to create account');
+            }
+        }
+
+        async function loadPosts() {
+            const res = await fetch(`/api/posts?userId=${currentUser}`);
+            const posts = await res.json();
+            const feed = document.getElementById('feed');
+            feed.innerHTML = '';
+
+            for (const post of posts) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="post-header">
+                        <div>
+                            <span class="author">${post.author_name}</span>
+                            <span class="username">@${post.username}</span>
+                        </div>
+                        ${post.user_id !== currentUser ? `<button style="padding: 0.3rem 0.7rem; font-size: 0.8rem;" onclick="toggleFollow(${post.user_id})">Follow</button>` : ''}
+                    </div>
+                    <p>${post.content}</p>
+                    <div class="post-actions">
+                        <button class="action-btn ${post.user_liked ? 'liked' : ''}" onclick="toggleLike(${post.id})">
+                            ❤️ ${post.likes_count} Likes
+                        </button>
+                        <button class="action-btn" onclick="toggleComments(${post.id})">
+                            💬 ${post.comments_count} Comments
+                        </button>
+                    </div>
+                    <div id="comments-${post.id}" class="comments-section" style="display:none;">
+                        <div id="comment-list-${post.id}"></div>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                            <input type="text" id="comment-input-${post.id}" placeholder="Write a comment..." style="margin-bottom:0;">
+                            <button onclick="addComment(${post.id})">Send</button>
+                        </div>
+                    </div>
+                `;
+                feed.appendChild(card);
+            }
+        }
+
+        async function createPost() {
+            const content = document.getElementById('postContent').value;
+            if (!content.trim()) return;
+
+            await fetch('/api/posts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUser, content })
+            });
+
+            document.getElementById('postContent').value = '';
+            loadPosts();
+        }
+
+        async function toggleLike(postId) {
+            await fetch(`/api/posts/${postId}/like`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUser })
+            });
+            loadPosts();
+        }
+
+        async function toggleFollow(followingId) {
+            await fetch('/api/follow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ follower_id: currentUser, following_id: followingId })
+            });
+            alert("Follow status updated!");
+        }
+
+        async function toggleComments(postId) {
+            const section = document.getElementById(`comments-${postId}`);
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                loadComments(postId);
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        async function loadComments(postId) {
+            const res = await fetch(`/api/posts/${postId}/comments`);
+            const comments = await res.json();
+            const list = document.getElementById(`comment-list-${postId}`);
+            list.innerHTML = '';
+            if (comments.length === 0) {
+                list.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No comments yet. Be the first!</div>';
+                return;
+            }
+            comments.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'comment';
+                div.innerHTML = `<strong>@${c.username}:</strong> ${c.content}`;
+                list.appendChild(div);
+            });
+        }
+
+        async function addComment(postId) {
+            const input = document.getElementById(`comment-input-${postId}`);
+            const content = input.value;
+            if (!content.trim()) return;
+
+            await fetch(`/api/posts/${postId}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUser, content })
+            });
+
+            input.value = '';
+            loadComments(postId);
+            loadPosts();
+        }
+
+        init();
+    </script>
+</body>
+</html>
