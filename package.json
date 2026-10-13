@@ -1,0 +1,12 @@
+{
+  "name": "pulse-social-media",
+  "version": "1.0.0",
+  "description": "Mini Social Media App with Express and JSON Storage",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
